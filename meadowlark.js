@@ -327,6 +327,9 @@ app.post('/cart/checkout', function(req, res){
     res.render('cart-thank-you', { cart: cart });
 });
 
+app.get('/fail', function(req, res){
+    throw new Error('yes me lord!');
+});
 
 // 404 catch-all handler (middleware)
 app.use(function(req, res, next){
