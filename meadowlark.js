@@ -327,9 +327,17 @@ app.post('/cart/checkout', function(req, res){
     res.render('cart-thank-you', { cart: cart });
 });
 
+//uncaught exceptions
 app.get('/fail', function(req, res){
     throw new Error('yes me lord!');
 });
+
+//this might shut down server
+app.get('/epic-fail', function(){
+    process.nextTick(function(){
+        throw new Error('Hooooo!');
+    });
+})
 
 // 404 catch-all handler (middleware)
 app.use(function(req, res, next){
