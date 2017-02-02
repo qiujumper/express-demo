@@ -316,12 +316,12 @@ app.post('/contest/vacation-photo/:year/:month', function(req, res){
         res.redirect(303, '/thank-you');
     });
 });
-app.get('/tours/:tour', function(req, res, next){
-	Product.findOne({ category: 'tour', slug: req.params.tour }, function(err, tour){
-		if(err) return next(err);
-		if(!tour) return next();
-		res.render('tour', { tour: tour });
-	});
+app.get('/vacation/:vacation', function(req, res, next){
+    Vacation.findOne({ slug: req.params.vacation }, function(err, vacation){
+        if(err) return next(err);
+        if(!vacation) return next();
+        res.render('vacation', { vacation: vacation });
+    });
 });
 app.get('/adventures/:subcat/:name', function(req, res, next){
 	Product.findOne({ category: 'adventure', slug: req.params.subcat + '/' + req.params.name  }, function(err, adventure){
@@ -337,16 +337,17 @@ app.use(cartValidation.checkWaivers);
 app.use(cartValidation.checkGuestCounts);
 
 app.post('/cart/add', function(req, res, next){
-	var cart = req.session.cart || (req.session.cart = { items: [] });
-	Product.findOne({ sku: req.body.sku }, function(err, product){
-		if(err) return next(err);
-		if(!product) return next(new Error('Unknown product SKU: ' + req.body.sku));
-		cart.items.push({
-			product: product,
-			guests: req.body.guests || 0,
-		});
-		res.redirect(303, '/cart');
-	});
+    console.log('here');
+    var cart = req.session.cart || (req.session.cart = { items: [] });
+    Vacation.findOne({ sku: req.body.sku }, function(err, vacation){
+        if(err) return next(err);
+        if(!vacation) return next(new Error('Unknown vacation SKU: ' + req.body.sku));
+        cart.items.push({
+            vacation: vacation,
+            guests: req.body.guests || 1,
+        });console.log(cart); console.log('good to go');
+        res.redirect(303, '/cart');
+    });
 });
 app.get('/cart', function(req, res, next){
 	var cart = req.session.cart;
