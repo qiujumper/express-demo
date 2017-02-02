@@ -1,5 +1,7 @@
 var express = require('express'),
 	fortune = require('./lib/fortune.js'),
+    mongoose = require('mongoose'),
+    Vacation = require('./models/vacation.js'),
 	formidable = require('formidable');
 
 var app = express();
@@ -7,6 +9,14 @@ var app = express();
 var credentials = require('./credentials.js');
 
 var emailService = require('./lib/email.js')(credentials);
+
+//connect mongoose
+var opts = {
+    server: {
+        socketOptions: {keepAlive: 1}
+    }
+};
+mongoose.connect(credentials.mongo.development.connectionString, opts);
 
 // set up handlebars view engine
 var handlebars = require('express3-handlebars').create({
@@ -35,16 +45,66 @@ app.use(require('body-parser')());
 
 switch(app.get('env')){
     case 'development':
-        app.use(require('morgan')('dev')); console.log('I am dev');
+        app.use(require('morgan')('dev')); 
         break;
 
     case 'production':
         app.use(require('express-logger')({
             path: __dirname + '/log/requests.log'
         }));
-        console.log('I am production');
+        
         break;
 }
+
+// initialize vacations
+Vacation.find(function(err, vacations){
+    if(vacations.length) return;
+
+    new Vacation({
+        name: 'Hood River Day Trip',
+        slug: 'hood-river-day-trip',
+        category: 'Day Trip',
+        sku: 'HR199',
+        description: 'Spend a day sailing on the Columbia and ' + 
+            'enjoying craft beers in Hood River!',
+        priceInCents: 9995,
+        tags: ['day trip', 'hood river', 'sailing', 'windsurfing', 'breweries'],
+        inSeason: true,
+        maximumGuests: 16,
+        available: true,
+        packagesSold: 0,
+    }).save();
+
+    new Vacation({
+        name: 'Oregon Coast Getaway',
+        slug: 'oregon-coast-getaway',
+        category: 'Weekend Getaway',
+        sku: 'OC39',
+        description: 'Enjoy the ocean air and quaint coastal towns!',
+        priceInCents: 269995,
+        tags: ['weekend getaway', 'oregon coast', 'beachcombing'],
+        inSeason: false,
+        maximumGuests: 8,
+        available: true,
+        packagesSold: 0,
+    }).save();
+
+    new Vacation({
+        name: 'Rock Climbing in Bend',
+        slug: 'rock-climbing-in-bend',
+        category: 'Adventure',
+        sku: 'B99',
+        description: 'Experience the thrill of rock climbing in the high desert.',
+        priceInCents: 289995,
+        tags: ['weekend getaway', 'bend', 'high desert', 'rock climbing', 'hiking', 'skiing'],
+        inSeason: true,
+        requiresWaiver: true,
+        maximumGuests: 4,
+        available: false,
+        packagesSold: 0,
+        notes: 'The tour guide is currently recovering from a skiing accident.',
+    }).save();
+});
 
 // flash message middleware
 app.use(function(req, res, next){
@@ -325,6 +385,22 @@ app.post('/cart/checkout', function(req, res){
 	    }
     );
     res.render('cart-thank-you', { cart: cart });
+});
+
+//vacation from mongoose
+app.get('/vacations', function(req, res){
+    Vacation.find({ available: true }, function(err, vacations){
+        var context = {
+            vacations: vacations.map(function(vacation){
+            return {
+                sku: vacation.sku,
+                name: vacation.name,
+                description: vacation.description, price: vacation.getDisplayPrice(), 
+                inSeason: vacation.inSeason,
+            } })
+        };
+        res.render('vacations', context);
+    });
 });
 
 //uncaught exceptions
