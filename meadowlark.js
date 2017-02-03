@@ -91,7 +91,7 @@ rest.get('/attractions', function(req, content, cb){
 });
 
 rest.post('/attraction', function(req, content, cb){
-    console.log('i am here');
+    console.log(req.body);
     var a = new Attraction({
         name: req.body.name,
         description: req.body.description,
@@ -130,7 +130,7 @@ app.use(function(req, res, next){
 });
 
 //add cross share
-app.use('/api', require('cors')());
+//app.use('/api', require('cors')());
 
 // set 'showTests' context property if the querystring contains test=1
 app.use(function(req, res, next){
@@ -383,7 +383,7 @@ app.use(cartValidation.checkWaivers);
 app.use(cartValidation.checkGuestCounts);
 
 app.post('/cart/add', function(req, res, next){
-    console.log('here');
+    console.log(req);
     var cart = req.session.cart || (req.session.cart = { items: [] });
     Vacation.findOne({ sku: req.body.sku }, function(err, vacation){
         if(err) return next(err);
