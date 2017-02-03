@@ -4,6 +4,7 @@ var express = require('express'),
     fs = require('fs'),
     Vacation = require('./models/vacation.js'),
     VacationInSeasonListener = require('./models/vacationInSeasonListener.js'),
+    rest = require('connect-rest'),
 	formidable = require('formidable');
 
 var app = express();
@@ -21,6 +22,15 @@ var opts = {
         socketOptions: {keepAlive: 1}
     }
 };
+
+var apiOptions = {
+    context: '/api',
+    domain: require('domain').create(),
+};
+
+app.use(rest.rester(apiOptions));
+
+var Attraction = require('./models/attraction.js');
 
 var MongoSessionStore = require('session-mongoose')(require('connect'));
 var sessionStore = new MongoSessionStore({
@@ -67,7 +77,48 @@ switch(app.get('env')){
         break;
 }
 
+rest.get('/attractions', function(req, content, cb){
+    Attraction.find({ approved: true }, function(err, attractions){
+        if(err) return cb({ error: 'Internal error.' });
+        cb(null, attractions.map(function(a){
+            return {
+                name: a.name,
+                description: a.description,
+                location: a.location,
+            };
+        }));
+    });
+});
 
+rest.post('/attraction', function(req, content, cb){
+    console.log('i am here');
+    var a = new Attraction({
+        name: req.body.name,
+        description: req.body.description,
+        location: { lat: req.body.lat, lng: req.body.lng },
+        history: {
+            event: 'created',
+            email: req.body.email,
+            date: new Date(),
+        },
+        approved: false,
+    });
+    a.save(function(err, a){
+        if(err) return cb({ error: 'Unable to add attraction.' });
+        cb(null, { id: a._id });
+    }); 
+});
+
+rest.get('/attraction/:id', function(req, content, cb){
+    Attraction.findById(req.params.id, function(err, a){
+        if(err) return cb({ error: 'Unable to retrieve attraction.' });
+        cb(null, { 
+            name: a.name,
+            description: a.description,
+            location: a.location,
+        });
+    });
+});
 
 // flash message middleware
 app.use(function(req, res, next){
@@ -77,6 +128,9 @@ app.use(function(req, res, next){
 	delete req.session.flash;
 	next();
 });
+
+//add cross share
+app.use('/api', require('cors')());
 
 // set 'showTests' context property if the querystring contains test=1
 app.use(function(req, res, next){
@@ -476,7 +530,7 @@ app.get('/epic-fail', function(){
 // add support for auto views
 var autoViews = {};
 
-app.use(function(req,res,next){ console.log('hi jack');
+app.use(function(req,res,next){ 
     var path = req.path.toLowerCase();  
     // check cache; if it's there, render the view
     if(autoViews[path]) return res.render(autoViews[path]);
