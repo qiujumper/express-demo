@@ -473,6 +473,7 @@ app.get('/epic-fail', function(){
 })
 
 // 404 catch-all handler (middleware)
+// there is no err param for 404
 app.use(function(req, res, next){
 	res.status(404);
 	res.render('404');
