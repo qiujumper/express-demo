@@ -2,6 +2,7 @@ var express = require('express'),
 	fortune = require('./lib/fortune.js'),
     mongoose = require('mongoose'),
     Vacation = require('./models/vacation.js'),
+    VacationInSeasonListener = require('./models/vacationInSeasonListener.js'),
 	formidable = require('formidable');
 
 var app = express();
@@ -301,6 +302,35 @@ app.post('/newsletter', function(req, res){
 app.get('/newsletter/archive', function(req, res){
 	res.render('newsletter/archive');
 });
+
+app.get('/notify-me-when-in-season', function(req, res){
+    res.render('notify-me-when-in-season', {sku: req.query.sku});
+});
+
+app.post('/notify-me-when-in-season', function(req, res){
+    VacationInSeasonListener.update(
+        {email: req.body.email},
+        {$push: {sku: req.body.sku}},
+        {upsert: true},
+        function(err){
+            if(err){
+                console.log(err.stack);
+                req.session.flash = {
+                    type: 'danger',
+                    intro: 'Oppps',
+                    message: 'There was an error processing your request.'
+                };
+                return res.redirect(303, '/vacations');
+            }
+            req.session.flash = {
+                type: 'success',
+                intro: 'Thank you!',
+                message: 'You will be notified when this vacation is in season.',
+            };
+            return res.redirect(303, '/vacations');
+        }
+    );
+});
 app.get('/contest/vacation-photo', function(req, res){
     var now = new Date();
     res.render('contest/vacation-photo', { year: now.getFullYear(), month: now.getMonth() });
@@ -349,6 +379,21 @@ app.post('/cart/add', function(req, res, next){
         res.redirect(303, '/cart');
     });
 });
+
+app.get('/cart/add', function(req, res, next){
+    var cart = req.session.cart || (req.session.cart = { items: [] });
+    Vacation.findOne({ sku: req.query.sku }, function(err, vacation){console.log('hereee');
+        if(err) return next(err);console.log('noot here?');
+        if(!vacation) return next(new Error('Unknown vacation SKU: ' + req.query.sku));
+        cart.items.push({
+            vacation: vacation,
+            guests: req.body.guests || 1,
+        });console.log(cart);
+        res.redirect(303, '/cart');
+    });
+});
+
+
 app.get('/cart', function(req, res, next){
 	var cart = req.session.cart;
 	if(!cart) next();
