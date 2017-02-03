@@ -7,16 +7,25 @@ var express = require('express'),
 
 var app = express();
 
+
+
 var credentials = require('./credentials.js');
 
 var emailService = require('./lib/email.js')(credentials);
 
+//start initializing code
 //connect mongoose
 var opts = {
     server: {
         socketOptions: {keepAlive: 1}
     }
 };
+
+var MongoSessionStore = require('session-mongoose')(require('connect'));
+var sessionStore = new MongoSessionStore({
+    url: credentials.mongo.development.connectionString
+});
+
 mongoose.connect(credentials.mongo.development.connectionString, opts);
 
 // set up handlebars view engine
@@ -40,8 +49,8 @@ app.use(require('express-session')({
     resave: false,
     saveUninitialized: false,
     secret: credentials.cookieSecret,
-}));
-app.use(express.static(__dirname + '/public'));
+    store: sessionStore,
+}));app.use(express.static(__dirname + '/public'));
 app.use(require('body-parser')());
 
 switch(app.get('env')){
@@ -57,55 +66,7 @@ switch(app.get('env')){
         break;
 }
 
-// initialize vacations
-Vacation.find(function(err, vacations){
-    if(vacations.length) return;
 
-    new Vacation({
-        name: 'Hood River Day Trip',
-        slug: 'hood-river-day-trip',
-        category: 'Day Trip',
-        sku: 'HR199',
-        description: 'Spend a day sailing on the Columbia and ' + 
-            'enjoying craft beers in Hood River!',
-        priceInCents: 9995,
-        tags: ['day trip', 'hood river', 'sailing', 'windsurfing', 'breweries'],
-        inSeason: true,
-        maximumGuests: 16,
-        available: true,
-        packagesSold: 0,
-    }).save();
-
-    new Vacation({
-        name: 'Oregon Coast Getaway',
-        slug: 'oregon-coast-getaway',
-        category: 'Weekend Getaway',
-        sku: 'OC39',
-        description: 'Enjoy the ocean air and quaint coastal towns!',
-        priceInCents: 269995,
-        tags: ['weekend getaway', 'oregon coast', 'beachcombing'],
-        inSeason: false,
-        maximumGuests: 8,
-        available: true,
-        packagesSold: 0,
-    }).save();
-
-    new Vacation({
-        name: 'Rock Climbing in Bend',
-        slug: 'rock-climbing-in-bend',
-        category: 'Adventure',
-        sku: 'B99',
-        description: 'Experience the thrill of rock climbing in the high desert.',
-        priceInCents: 289995,
-        tags: ['weekend getaway', 'bend', 'high desert', 'rock climbing', 'hiking', 'skiing'],
-        inSeason: true,
-        requiresWaiver: true,
-        maximumGuests: 4,
-        available: false,
-        packagesSold: 0,
-        notes: 'The tour guide is currently recovering from a skiing accident.',
-    }).save();
-});
 
 // flash message middleware
 app.use(function(req, res, next){
@@ -436,18 +397,43 @@ app.post('/cart/checkout', function(req, res){
 //vacation from mongoose
 app.get('/vacations', function(req, res){
     Vacation.find({ available: true }, function(err, vacations){
+        var currency = req.session.currency || 'USD';
         var context = {
+            currency: currency,
             vacations: vacations.map(function(vacation){
-            return {
-                sku: vacation.sku,
-                name: vacation.name,
-                description: vacation.description, price: vacation.getDisplayPrice(), 
-                inSeason: vacation.inSeason,
-            } })
+                return {
+                    sku: vacation.sku,
+                    name: vacation.name,
+                    description: vacation.description,
+                    inSeason: vacation.inSeason,
+                    price: convertFromUSD(vacation.priceInCents/100, currency).toFixed(2),
+                    qty: vacation.qty,
+                };
+            })
         };
+        switch(currency){
+            case 'USD': context.currencyUSD = 'selected'; break;
+            case 'GBP': context.currencyGBP = 'selected'; break;
+            case 'BTC': context.currencyBTC = 'selected'; break;
+        }
         res.render('vacations', context);
     });
 });
+
+//currency
+app.get('/set-currency/:currency', function(req, res){
+    req.session.currency = req.params.currency;
+    return res.redirect(303, '/vacations');
+});
+
+function convertFromUSD(value, currency){
+    switch(currency){
+        case 'USD': return value * 1;
+        case 'GBP': return value * 0.6;
+        case 'BTC': return value * 0.0023707918444761;
+        default: return NaN;
+    }
+}
 
 //uncaught exceptions
 app.get('/fail', function(req, res){
