@@ -434,7 +434,32 @@ function convertFromUSD(value, currency){
         default: return NaN;
     }
 }
+//test route
+app.get('/foo',
+    function(req,res,next){
+        if(Math.random() < 0.33) return next();
+        res.send('red');
+    },
+    function(req, res, next){
+        if (Math.random() < 0.5) return next();
+        res.send('green');
+    },
+    function(req, res){
+        res.send('blue');
+    }
+);
 
+//use authorize as midware
+function authorize(req, res, next){
+    if (req.session.authorize) {
+        return next();
+    }
+    res.send('not authorized:(');
+}
+
+app.get('/secret', authorize, function(){
+    res.send('I want to see secret');
+});
 //uncaught exceptions
 app.get('/fail', function(req, res){
     throw new Error('yes me lord!');
